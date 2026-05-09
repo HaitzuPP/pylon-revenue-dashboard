@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pylon Partners — Revenue by Client</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #fff; color: #111; padding: 36px 40px; max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 3px; }
+  .subtitle { font-size: 11px; color: #999; letter-spacing: 0.04em; margin-bottom: 28px; }
+
+  .stats-bar { display: flex; gap: 1px; margin-bottom: 28px; background: #e0e0e0; border: 1px solid #e0e0e0; }
+  .stat { background: #fff; padding: 16px 22px; flex: 1; }
+  .stat-label { font-size: 9px; color: #999; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; }
+  .stat-value { font-size: 24px; font-weight: 700; line-height: 1; }
+  .stat-value.green { color: #1a7a3a; }
+  .stat-sub { font-size: 10px; color: #999; margin-top: 4px; }
+
+  .filter-bar { display: flex; gap: 4px; margin-bottom: 24px; flex-wrap: wrap; }
+  .filter-btn {
+    font-family: Arial; font-size: 10px; font-weight: 700;
+    padding: 6px 14px; border: 1px solid #ddd;
+    background: #fff; cursor: pointer; color: #999;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    transition: all 0.1s;
+  }
+  .filter-btn:hover { border-color: #999; color: #111; }
+  .filter-btn.active { background: #111; color: #fff; border-color: #111; }
+
+  .section-label {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.12em; color: #999; margin-bottom: 12px;
+    padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .chart-toggle { display: flex; gap: 2px; }
+  .chart-toggle-btn {
+    font-family: Arial; font-size: 9px; font-weight: 700;
+    padding: 3px 10px; border: 1px solid #ddd;
+    background: #fff; cursor: pointer; color: #bbb;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    transition: all 0.1s;
+  }
+  .chart-toggle-btn.active { background: #111; color: #fff; border-color: #111; }
+
+  .chart-row { margin-bottom: 32px; }
+  .chart-wrap { border: 1px solid #e0e0e0; padding: 20px 24px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 32px; }
+
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 520px; }
+  thead { border-bottom: 2px solid #111; }
+  th { padding: 9px 12px; text-align: left; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #999; }
+  th.right { text-align: right; }
+  td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+  td.right { text-align: right; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafafa; }
+
+  /* ── Mobile ─────────────────────────────────────────── */
+  @media (max-width: 640px) {
+    body { padding: 16px; }
+    h1 { font-size: 12px; letter-spacing: 0.08em; }
+    .subtitle { font-size: 10px; margin-bottom: 18px; }
+
+    .stats-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+    }
+    .stat { padding: 12px 14px; }
+    .stat-value { font-size: 18px; }
+    .stat-value#statTopClient { font-size: 13px !important; }
+
+    .filter-bar { gap: 3px; margin-bottom: 16px; }
+    .filter-btn { font-size: 9px; padding: 5px 10px; }
+
+    .chart-row { margin-bottom: 20px; }
+    .chart-wrap { padding: 12px; }
+
+    .section-label { font-size: 8px; }
+    .chart-toggle-btn { font-size: 8px; padding: 3px 8px; }
+
+    .bar-cell { width: 80px; }
+    table { font-size: 11px; }
+    td, th { padding: 7px 8px; }
+  }
+
+  .rank { font-size: 10px; color: #ccc; font-weight: 700; width: 28px; }
+  .client-name { font-weight: 700; font-size: 12px; }
+  .amount { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pct { font-size: 11px; color: #999; }
+  .bar-cell { width: 180px; }
+  .mini-bar-bg { background: #f0f0f0; height: 5px; border-radius: 1px; }
+  .mini-bar { height: 5px; background: #1a7a3a; border-radius: 1px; transition: width 0.3s; }
+  .invoices { font-size: 10px; color: #bbb; }
+
+  #noData { text-align: center; padding: 40px; color: #999; font-size: 13px; display: none; }
+</style>
+</head>
+<body>
+
+<h1>Pylon Partners — Revenue by Client</h1>
+<div class="subtitle">Received invoices only &nbsp;·&nbsp; Apr 2024 – Dec 2025 &nbsp;·&nbsp; All amounts USD</div>
+
+<div class="stats-bar" id="statsBar">
+  <div class="stat">
+    <div class="stat-label">Total Revenue</div>
+    <div class="stat-value green" id="statTotal">—</div>
+    <div class="stat-sub" id="statPeriod">All periods</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Active Clients</div>
+    <div class="stat-value" id="statClients">—</div>
+    <div class="stat-sub" id="statInvoices">— invoices</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Top Client</div>
+    <div class="stat-value" id="statTopClient" style="font-size:17px;">—</div>
+    <div class="stat-sub" id="statTopPct">—% of total</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Avg per Client</div>
+    <div class="stat-value" id="statAvg">—</div>
+    <div class="stat-sub">received revenue</div>
+  </div>
+</div>
+
+<div class="filter-bar" id="filterBar">
+  <button class="filter-btn active" data-period="all">All Time</button>
+  <button class="filter-btn" data-period="2024">2024</button>
+  <button class="filter-btn" data-period="2025">2025</button>
+  <button class="filter-btn" data-period="q1-2025">Q1 2025</button>
+  <button class="filter-btn" data-period="q2-2025">Q2 2025</button>
+  <button class="filter-btn" data-period="q3-2025">Q3 2025</button>
+  <button class="filter-btn" data-period="q4-2025">Q4 2025</button>
+</div>
+
+<div class="chart-row">
+  <div class="section-label">Revenue Contribution by Client</div>
+  <div class="chart-wrap">
+    <canvas id="barChart"></canvas>
+  </div>
+</div>
+
+<div class="chart-row">
+  <div class="section-label">
+    <span>Monthly Revenue — Top 6 Clients</span>
+    <div class="chart-toggle">
+      <button class="chart-toggle-btn active" id="toggleLine">Line</button>
+      <button class="chart-toggle-btn" id="toggleStack">Stack</button>
+    </div>
+  </div>
+  <div class="chart-wrap">
+    <canvas id="lineChart" height="100"></canvas>
+    <canvas id="stackChart" height="100" style="display:none;"></canvas>
+  </div>
+</div>
+
+<div class="section-label"><span>Client Breakdown</span></div>
+<div id="noData">No received invoices in this period.</div>
+<div class="table-scroll">
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Client</th>
+      <th class="right">Revenue</th>
+      <th class="right">% of Total</th>
+      <th>Share</th>
+      <th class="right">Invoices</th>
+    </tr>
+  </thead>
+  <tbody id="tableBody"></tbody>
+</table>
+</div>
+
+<script>
+const RAW = [
+  // Apr 2024
+  { date: '2024-04-06', client: 'Fantom',       amount: 3748 },
+  { date: '2024-04-07', client: 'Black Block',   amount: 7500 },
+  // May 2024
+  { date: '2024-05-12', client: 'Fantom',        amount: 6000 },
+  { date: '2024-05-19', client: 'Black Block',   amount: 7500 },
+  { date: '2024-05-28', client: 'Fantom',        amount: 26222 },
+  // Jun 2024
+  { date: '2024-06-15', client: 'Pucca',         amount: 2500 },
+  // Jul 2024
+  { date: '2024-07-04', client: 'dFusion AI',    amount: 6250 },
+  // Aug 2024
+  { date: '2024-08-18', client: 'The Sprawl',    amount: 15000 },
+  // Sep 2024
+  { date: '2024-09-14', client: 'NRN Agents',    amount: 12000 },
+  // Oct 2024
+  { date: '2024-10-01', client: '77 Bit',        amount: 5000 },
+  { date: '2024-10-18', client: 'Auto Legends',  amount: 8000 },
+  { date: '2024-10-28', client: 'NRN Agents',    amount: 12000 },
+  // Nov 2024
+  { date: '2024-11-09', client: 'Tatsumeeko',    amount: 10000 },
+  { date: '2024-11-13', client: 'Fableborne',    amount: 20000 },
+  { date: '2024-11-13', client: '77 Bit',        amount: 5000 },
+  { date: '2024-11-18', client: 'Auto Legends',  amount: 8000 },
+  { date: '2024-11-28', client: 'NRN Agents',    amount: 12000 },
+  // Dec 2024
+  { date: '2024-12-06', client: 'EF',            amount: 9000 },
+  { date: '2024-12-13', client: 'Fableborne',    amount: 20000 },
+  { date: '2024-12-14', client: 'NRN Agents',    amount: 15000 },
+  { date: '2024-12-16', client: 'Pirate Nation', amount: 5000 },
+  { date: '2024-12-16', client: 'NRN Agents',    amount: 136000 },
+  { date: '2024-12-18', client: 'Auto Legends',  amount: 8000 },
+  { date: '2024-12-19', client: 'Oasys',         amount: 30000 },
+  // Jan 2025
+  { date: '2025-01-13', client: 'Fableborne',    amount: 20000 },
+  { date: '2025-01-16', client: 'NRN Agents',    amount: 15000 },
+  { date: '2025-01-16', client: 'Pirate Nation', amount: 5000 },
+  { date: '2025-01-16', client: 'Oasys',         amount: 30000 },
+  // Feb 2025
+  { date: '2025-02-02', client: 'Castile',       amount: 10000 },
+  { date: '2025-02-15', client: 'NRN Agents',    amount: 15000 },
+  { date: '2025-02-15', client: 'Pirate Nation', amount: 5000 },
+  { date: '2025-02-15', client: 'Oasys',         amount: 30000 },
+  { date: '2025-02-23', client: 'Fableborne',    amount: 20000 },
+  // Mar 2025
+  { date: '2025-03-12', client: 'INF Crypto',    amount: 4050 },
+  { date: '2025-03-14', client: 'NRN Agents',    amount: 15000 },
+  { date: '2025-03-19', client: 'EF',            amount: 3000 },
+  { date: '2025-03-22', client: 'Fableborne',    amount: 20000 },
+  { date: '2025-03-22', client: 'Oasys',         amount: 30000 },
+  { date: '2025-03-31', client: 'Oasys',         amount: 12500 },
+  // Apr 2025
+  { date: '2025-04-13', client: 'Fableborne',    amount: 20000 },
+  { date: '2025-04-13', client: 'Oasys',         amount: 30000 },
+  { date: '2025-04-19', client: 'NRN Agents',    amount: 15000 },
+  { date: '2025-04-30', client: 'Oasys',         amount: 13373 },
+  // May 2025
+  { date: '2025-05-13', client: 'Oasys',         amount: 30000 },
+  { date: '2025-05-13', client: 'Oasys',         amount: 13373 },
+  { date: '2025-05-19', client: 'NRN Agents',    amount: 15000 },
+  // Jun 2025
+  { date: '2025-06-13', client: 'NRN Agents',    amount: 15000 },
+  { date: '2025-06-13', client: 'Oasys',         amount: 13373 },
+  { date: '2025-06-30', client: 'Mythical Games', amount: 17000 },
+  // Jul 2025
+  { date: '2025-07-27', client: 'NRN Agents',    amount: 15000 },
+  { date: '2025-07-30', client: 'Mythical Games', amount: 17000 },
+  // Aug 2025
+  { date: '2025-08-04', client: 'MAGIC',         amount: 13907 },
+  { date: '2025-08-05', client: 'Mythical Games', amount: 15000 },
+  { date: '2025-08-13', client: 'NRN Agents',    amount: 15000 },
+  { date: '2025-08-13', client: 'Sonic SVM',     amount: 17000 },
+  { date: '2025-08-15', client: 'Super Gaming',  amount: 60390 },
+  { date: '2025-08-17', client: 'Playsout',      amount: 5000 },
+  { date: '2025-08-30', client: 'Mythical Games', amount: 17000 },
+  // Sep 2025
+  { date: '2025-09-03', client: 'MAGIC',         amount: 13908 },
+  { date: '2025-09-05', client: 'Mythical Games', amount: 15000 },
+  { date: '2025-09-13', client: 'NRN Agents',    amount: 15000 },
+  { date: '2025-09-22', client: 'SIRE',          amount: 10000 },
+  // Oct 2025
+  { date: '2025-10-01', client: 'Chiliz',        amount: 7500 },
+  { date: '2025-10-05', client: 'MAGIC',         amount: 17000 },
+  { date: '2025-10-05', client: 'Mythical Games', amount: 15000 },
+  { date: '2025-10-10', client: 'B3',            amount: 10000 },
+  { date: '2025-10-13', client: 'NRN Agents',    amount: 15000 },
+  { date: '2025-10-22', client: 'SIRE',          amount: 10000 },
+  { date: '2025-10-25', client: 'Mythical Games', amount: 12530 },
+  { date: '2025-10-30', client: 'Chiliz',        amount: 15000 },
+  // Nov 2025
+  { date: '2025-11-04', client: 'CODEC',         amount: 3000 },
+  { date: '2025-11-05', client: 'Mythical Games', amount: 7500 },
+  { date: '2025-11-06', client: 'Super Gaming',  amount: 12500 },
+  { date: '2025-11-10', client: 'MAGIC',         amount: 6374 },
+  { date: '2025-11-12', client: 'NRN Agents',    amount: 15000 },
+  { date: '2025-11-12', client: 'SIRE',          amount: 10000 },
+  { date: '2025-11-28', client: 'Sammy',         amount: 1200 },
+  // Dec 2025
+  { date: '2025-12-01', client: 'Chiliz',        amount: 7500 },
+  { date: '2025-12-06', client: 'Sammy',         amount: 1000 },
+  { date: '2025-12-11', client: 'Sammy',         amount: 350 },
+];
+
+// --- Period filter logic ---
+function inPeriod(dateStr, period) {
+  const d = new Date(dateStr);
+  const y = d.getFullYear();
+  const m = d.getMonth() + 1; // 1-indexed
+  if (period === 'all') return true;
+  if (period === '2024') return y === 2024;
+  if (period === '2025') return y === 2025;
+  if (period === 'q1-2025') return y === 2025 && m >= 1 && m <= 3;
+  if (period === 'q2-2025') return y === 2025 && m >= 4 && m <= 6;
+  if (period === 'q3-2025') return y === 2025 && m >= 7 && m <= 9;
+  if (period === 'q4-2025') return y === 2025 && m >= 10 && m <= 12;
+  return true;
+}
+
+// --- Aggregate by client ---
+function aggregate(data) {
+  const map = {};
+  data.forEach(r => {
+    if (!map[r.client]) map[r.client] = { total: 0, count: 0 };
+    map[r.client].total += r.amount;
+    map[r.client].count++;
+  });
+  return Object.entries(map)
+    .map(([client, v]) => ({ client, total: v.total, count: v.count }))
+    .sort((a, b) => b.total - a.total);
+}
+
+// --- Monthly data ---
+function getMonthlyData(data, topClients) {
+  const months = {};
+  data.forEach(r => {
+    const d = new Date(r.date);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if (!months[key]) months[key] = {};
+    const c = topClients.includes(r.client) ? r.client : 'Other';
+    months[key][c] = (months[key][c] || 0) + r.amount;
+  });
+  return months;
+}
+
+// --- Format helpers ---
+const fmt = v => '$' + Math.round(v).toLocaleString();
+const fmtK = v => v >= 1000000 ? '$' + (v/1000000).toFixed(2) + 'M' : v >= 1000 ? '$' + Math.round(v/1000) + 'K' : '$' + Math.round(v);
+
+// --- Colors ---
+const PALETTE = [
+  '#1a7a3a', '#2d6a8a', '#7a3a1a', '#6a2d8a', '#8a7a1a',
+  '#c0392b', '#1a6a7a', '#7a1a6a', '#3a7a1a', '#8a3a2d',
+];
+const OTHER_COLOR = '#cccccc';
+
+// --- Chart instances ---
+let barChartInst = null;
+let lineChartInst = null;
+let stackChartInst = null;
+let activeMonthlyView = 'line'; // 'line' | 'stack'
+
+function render(period) {
+  const filtered = RAW.filter(r => inPeriod(r.date, period));
+  const agg = aggregate(filtered);
+  const total = agg.reduce((s, r) => s + r.total, 0);
+  const invoiceCount = filtered.length;
+
+  // Stats
+  document.getElementById('statTotal').textContent = fmtK(total);
+  document.getElementById('statClients').textContent = agg.length;
+  document.getElementById('statInvoices').textContent = invoiceCount + ' invoices';
+  document.getElementById('statTopClient').textContent = agg[0]?.client || '—';
+  document.getElementById('statTopPct').textContent = agg[0] ? (agg[0].total/total*100).toFixed(1) + '% of total' : '';
+  document.getElementById('statAvg').textContent = agg.length ? fmtK(total/agg.length) : '—';
+
+  const periodLabels = {
+    'all': 'Apr 2024 – Dec 2025',
+    '2024': 'Calendar year 2024',
+    '2025': 'Calendar year 2025',
+    'q1-2025': 'Q1 2025 (Jan – Mar)',
+    'q2-2025': 'Q2 2025 (Apr – Jun)',
+    'q3-2025': 'Q3 2025 (Jul – Sep)',
+    'q4-2025': 'Q4 2025 (Oct – Dec)',
+  };
+  document.getElementById('statPeriod').textContent = periodLabels[period];
+
+  // --- Bar chart ---
+  const barLabels = agg.map(r => r.client);
+  const barData = agg.map(r => r.total);
+  const barColors = agg.map((_, i) => PALETTE[i % PALETTE.length]);
+
+  if (barChartInst) barChartInst.destroy();
+  const barCtx = document.getElementById('barChart').getContext('2d');
+  const barHeight = Math.max(280, agg.length * 30);
+  document.getElementById('barChart').style.height = barHeight + 'px';
+  barChartInst = new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels: barLabels,
+      datasets: [{
+        data: barData,
+        backgroundColor: barColors,
+        borderWidth: 0,
+        borderRadius: 2,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ' ' + fmt(ctx.parsed.x) + '  (' + (ctx.parsed.x/total*100).toFixed(1) + '%)'
+          },
+          titleFont: { family: 'Arial', size: 12 },
+          bodyFont: { family: 'Arial', size: 12 },
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: '#f0f0f0' },
+          ticks: {
+            font: { family: 'Arial', size: 10 },
+            color: '#999',
+            callback: v => fmtK(v)
+          },
+          border: { display: false }
+        },
+        y: {
+          grid: { display: false },
+          ticks: {
+            font: { family: 'Arial', size: 11, weight: '700' },
+            color: '#111'
+          },
+          border: { display: false }
+        }
+      }
+    }
+  });
+
+  // --- Monthly charts (line + stacked) ---
+  const top6 = agg.slice(0, 6).map(r => r.client);
+  const monthlyData = getMonthlyData(filtered, top6);
+  const sortedMonths = Object.keys(monthlyData).sort();
+
+  const monthLabels = sortedMonths.map(m => {
+    const [y, mo] = m.split('-');
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return names[parseInt(mo)-1] + ' ' + y.slice(2);
+  });
+
+  const sharedLegend = {
+    position: 'bottom',
+    labels: {
+      font: { family: 'Arial', size: 10 },
+      color: '#666',
+      boxWidth: 12,
+      padding: 16,
+      usePointStyle: true,
+    }
+  };
+
+  // LINE chart
+  const lineDatasets = top6.map((client, i) => ({
+    label: client,
+    data: sortedMonths.map(m => monthlyData[m]?.[client] || 0),
+    borderColor: PALETTE[i],
+    backgroundColor: PALETTE[i] + '18',
+    borderWidth: 2,
+    pointRadius: 3,
+    pointHoverRadius: 5,
+    tension: 0.3,
+    fill: false,
+  }));
+  if (agg.length > 6) {
+    lineDatasets.push({
+      label: 'Other',
+      data: sortedMonths.map(m => monthlyData[m]?.['Other'] || 0),
+      borderColor: OTHER_COLOR,
+      backgroundColor: OTHER_COLOR + '18',
+      borderWidth: 1.5,
+      pointRadius: 2,
+      tension: 0.3,
+      fill: false,
+      borderDash: [4, 3],
+    });
+  }
+
+  if (lineChartInst) lineChartInst.destroy();
+  const lineCtx = document.getElementById('lineChart').getContext('2d');
+  lineChartInst = new Chart(lineCtx, {
+    type: 'line',
+    data: { labels: monthLabels, datasets: lineDatasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: sharedLegend,
+        tooltip: {
+          callbacks: {
+            label: ctx => ' ' + ctx.dataset.label + ': ' + fmt(ctx.parsed.y)
+          },
+          titleFont: { family: 'Arial', size: 11 },
+          bodyFont: { family: 'Arial', size: 11 },
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: '#f5f5f5' },
+          ticks: { font: { family: 'Arial', size: 10 }, color: '#999' },
+          border: { display: false }
+        },
+        y: {
+          grid: { color: '#f5f5f5' },
+          ticks: { font: { family: 'Arial', size: 10 }, color: '#999', callback: v => fmtK(v) },
+          border: { display: false }
+        }
+      }
+    }
+  });
+
+  // STACKED BAR chart — all clients, stacked
+  const allClients = agg.map(r => r.client);
+  const fullMonthlyData = getMonthlyData(filtered, allClients);
+  const stackDatasets = allClients.map((client, i) => ({
+    label: client,
+    data: sortedMonths.map(m => fullMonthlyData[m]?.[client] || 0),
+    backgroundColor: PALETTE[i % PALETTE.length],
+    borderWidth: 0,
+    borderRadius: 0,
+  }));
+
+  if (stackChartInst) stackChartInst.destroy();
+  const stackCtx = document.getElementById('stackChart').getContext('2d');
+  stackChartInst = new Chart(stackCtx, {
+    type: 'bar',
+    data: { labels: monthLabels, datasets: stackDatasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: sharedLegend,
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.parsed.y > 0 ? (' ' + ctx.dataset.label + ': ' + fmt(ctx.parsed.y)) : null,
+            footer: items => {
+              const total = items.reduce((s, i) => s + i.parsed.y, 0);
+              return 'Total: ' + fmt(total);
+            }
+          },
+          titleFont: { family: 'Arial', size: 11 },
+          bodyFont: { family: 'Arial', size: 11 },
+          footerFont: { family: 'Arial', size: 11, weight: '700' },
+        }
+      },
+      scales: {
+        x: {
+          stacked: true,
+          grid: { display: false },
+          ticks: { font: { family: 'Arial', size: 10 }, color: '#999' },
+          border: { display: false }
+        },
+        y: {
+          stacked: true,
+          grid: { color: '#f5f5f5' },
+          ticks: { font: { family: 'Arial', size: 10 }, color: '#999', callback: v => fmtK(v) },
+          border: { display: false }
+        }
+      }
+    }
+  });
+
+  // Apply current view visibility
+  applyMonthlyView();
+
+  // --- Table ---
+  const tbody = document.getElementById('tableBody');
+  const noData = document.getElementById('noData');
+  tbody.innerHTML = '';
+  if (agg.length === 0) {
+    noData.style.display = 'block';
+  } else {
+    noData.style.display = 'none';
+    agg.forEach((row, i) => {
+      const pct = (row.total / total * 100).toFixed(1);
+      const barW = Math.round(row.total / agg[0].total * 100);
+      tbody.innerHTML += `
+        <tr>
+          <td class="rank">${i + 1}</td>
+          <td><span class="client-name">${row.client}</span></td>
+          <td class="right"><span class="amount">${fmt(row.total)}</span></td>
+          <td class="right"><span class="pct">${pct}%</span></td>
+          <td class="bar-cell">
+            <div class="mini-bar-bg">
+              <div class="mini-bar" style="width:${barW}%; background:${PALETTE[i % PALETTE.length]};"></div>
+            </div>
+          </td>
+          <td class="right invoices">${row.count}</td>
+        </tr>`;
+    });
+  }
+}
+
+// --- Monthly view toggle ---
+function applyMonthlyView() {
+  const lineEl = document.getElementById('lineChart');
+  const stackEl = document.getElementById('stackChart');
+  if (activeMonthlyView === 'stack') {
+    lineEl.style.display = 'none';
+    stackEl.style.display = 'block';
+  } else {
+    lineEl.style.display = 'block';
+    stackEl.style.display = 'none';
+  }
+}
+
+document.getElementById('toggleLine').addEventListener('click', () => {
+  activeMonthlyView = 'line';
+  document.getElementById('toggleLine').classList.add('active');
+  document.getElementById('toggleStack').classList.remove('active');
+  applyMonthlyView();
+});
+
+document.getElementById('toggleStack').addEventListener('click', () => {
+  activeMonthlyView = 'stack';
+  document.getElementById('toggleStack').classList.add('active');
+  document.getElementById('toggleLine').classList.remove('active');
+  applyMonthlyView();
+});
+
+// --- Filter buttons ---
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    render(btn.dataset.period);
+  });
+});
+
+// Initial render
+render('all');
+</script>
+</body>
+</html>
